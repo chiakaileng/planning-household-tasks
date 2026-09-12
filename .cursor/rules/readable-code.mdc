@@ -1,0 +1,14 @@
+---
+description: Readable, object-oriented code with no hardcoded values
+alwaysApply: true
+---
+
+# Readable code, no hardcoding
+
+- Prefer small classes with one job over large procedural files.
+- Name things for a human who will edit this later (`RecipeImporter`, `JsonLdRecipeParser`), not abbreviations.
+- Comments explain *why* and the flow a reader should follow. Do not narrate obvious syntax.
+- Never hardcode secrets, model names, timeouts, URLs, or site-specific scrapers in business logic. Read them from `src/config` or environment variables.
+- Swappable pieces (JSON-LD parse, LLM extract, page fetch) talk through interfaces so they can be replaced without rewriting the import flow.
+- Test fixtures may contain example HTML/recipes. Production code must not embed sample recipes or real site URLs.
+- When adding a later feature, write/ask the spec first (Context, Goal, Phases, In/Out of scope, Acceptance criteria, Edge cases, Deliverable, Notes).

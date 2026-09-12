@@ -1,0 +1,69 @@
+// SQLite is enough for one household. DATABASE_URL lives in .env.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Recipe {
+  id         String   @id @default(cuid())
+  title      String
+  sourceType String
+  sourceUrl  String?
+  sourceText String?
+  servings   Int?
+  notes      String?
+  createdAt  DateTime @default(now())
+  ingredients Ingredient[]
+  steps       Step[]
+  tags        RecipeTag[]
+}
+
+model Ingredient {
+  id           String  @id @default(cuid())
+  recipeId     String
+  recipe       Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  name         String
+  quantity     String?
+  unit         String?
+  note         String?
+  parseFlagged Boolean @default(false)
+  sortOrder    Int
+}
+
+model Step {
+  id          String @id @default(cuid())
+  recipeId    String
+  recipe      Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  instruction String
+  sortOrder   Int
+}
+
+model Tag {
+  id      String      @id @default(cuid())
+  name    String      @unique
+  recipes RecipeTag[]
+}
+
+model RecipeTag {
+  recipeId String
+  tagId    String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, tagId])
+}
+
+// One row per Gemini call so you can see this-call and lifetime estimated spend.
+model LlmUsageEvent {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  model         String
+  purpose       String
+  inputTokens   Int
+  outputTokens  Int
+  estimatedUsd  Float
+}
