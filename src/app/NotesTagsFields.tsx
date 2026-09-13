@@ -72,7 +72,7 @@ export function NotesTagsFields({
           }}
           placeholder="child, family, spicy"
         />
-        <button className="btn" type="button" onClick={addTag}>
+        <button className="btn" type="button" onClick={() => addTag()}>
           Add tag
         </button>
       </div>

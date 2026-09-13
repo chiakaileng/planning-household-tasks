@@ -37,7 +37,7 @@ export const RecipeDetailPanel = forwardRef<RecipeDetailHandle, {
       body: JSON.stringify({ draft }),
     });
     const result = await readApiJson<{ recipe?: SavedRecipe; error?: string }>(response);
-    if (result.recipe) {
+    if ("recipe" in result && result.recipe) {
       setDraft(toDraft(result.recipe));
       onSaved(result.recipe);
       return true;

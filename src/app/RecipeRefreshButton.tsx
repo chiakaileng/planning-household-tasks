@@ -11,7 +11,7 @@ export async function refreshRecipeFromSource(id: string): Promise<
 > {
   const response = await fetch(`/api/recipes/${id}/refresh`, { method: "POST" });
   const result = await readApiJson<{ recipe?: SavedRecipe; cost?: LlmCostSnapshot | null; error?: string }>(response);
-  if (result.recipe) {
+  if ("recipe" in result && result.recipe) {
     return { ok: true, recipe: result.recipe, cost: result.cost ?? null };
   }
   return { ok: false, error: result.error ?? "Could not refresh this recipe." };

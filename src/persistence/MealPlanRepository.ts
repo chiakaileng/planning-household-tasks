@@ -72,11 +72,7 @@ export class MealPlanRepository implements IMealPlanRepository {
       _max: { sortOrder: true },
     });
     const created = await this.db.mealDish.create({
-      data: dishRelationData(prepared.fields, {
-        mealId,
-        sortOrder: (last._max.sortOrder ?? -1) + 1,
-        creating: true,
-      }),
+      data: dishCreateData(prepared.fields, mealId, (last._max.sortOrder ?? -1) + 1),
     });
     if (prepared.eaters.length > 0) {
       await this.db.mealDishEater.createMany({
@@ -112,7 +108,7 @@ export class MealPlanRepository implements IMealPlanRepository {
       await tx.mealDishEater.deleteMany({ where: { dishId } });
       await tx.mealDish.update({
         where: { id: dishId },
-        data: dishRelationData(
+        data: dishUpdateData(
           prepared.fields,
           moved ? { mealId: nextMealId, sortOrder: (last?._max.sortOrder ?? -1) + 1 } : null,
         ),
@@ -385,21 +381,19 @@ function toPlannedDish(row: DishRow): PlannedDish {
   };
 }
 
-function dishRelationData(
-  fields: {
-    contentType: string;
-    recipeId: string | null;
-    sourceMealId: string | null;
-    sourceDishId: string | null;
-    leftoverText: string | null;
-    freeformText: string | null;
-    titleSnapshot: string;
-    cookMemberId: string | null;
-    cookNameSnapshot: string;
-  },
-  meal: { mealId: string; sortOrder: number; creating?: boolean } | null,
-) {
-  const creating = meal?.creating === true;
+type DishWriteFields = {
+  contentType: string;
+  recipeId: string | null;
+  sourceMealId: string | null;
+  sourceDishId: string | null;
+  leftoverText: string | null;
+  freeformText: string | null;
+  titleSnapshot: string;
+  cookMemberId: string | null;
+  cookNameSnapshot: string;
+};
+
+function dishScalars(fields: DishWriteFields) {
   return {
     contentType: fields.contentType,
     leftoverText: fields.leftoverText,
@@ -407,10 +401,27 @@ function dishRelationData(
     titleSnapshot: fields.titleSnapshot,
     cookNameSnapshot: fields.cookNameSnapshot,
     sourceDishId: fields.sourceDishId,
-    recipe: fields.recipeId ? { connect: { id: fields.recipeId } } : creating ? undefined : { disconnect: true },
-    sourceMeal: fields.sourceMealId ? { connect: { id: fields.sourceMealId } } : creating ? undefined : { disconnect: true },
-    cook: fields.cookMemberId ? { connect: { id: fields.cookMemberId } } : creating ? undefined : { disconnect: true },
-    ...(meal ? { meal: { connect: { id: meal.mealId } }, sortOrder: meal.sortOrder } : {}),
+  };
+}
+
+function dishCreateData(fields: DishWriteFields, mealId: string, sortOrder: number) {
+  return {
+    ...dishScalars(fields),
+    sortOrder,
+    meal: { connect: { id: mealId } },
+    recipe: fields.recipeId ? { connect: { id: fields.recipeId } } : undefined,
+    sourceMeal: fields.sourceMealId ? { connect: { id: fields.sourceMealId } } : undefined,
+    cook: fields.cookMemberId ? { connect: { id: fields.cookMemberId } } : undefined,
+  };
+}
+
+function dishUpdateData(fields: DishWriteFields, move: { mealId: string; sortOrder: number } | null) {
+  return {
+    ...dishScalars(fields),
+    recipe: fields.recipeId ? { connect: { id: fields.recipeId } } : { disconnect: true },
+    sourceMeal: fields.sourceMealId ? { connect: { id: fields.sourceMealId } } : { disconnect: true },
+    cook: fields.cookMemberId ? { connect: { id: fields.cookMemberId } } : { disconnect: true },
+    ...(move ? { meal: { connect: { id: move.mealId } }, sortOrder: move.sortOrder } : {}),
   };
 }
 

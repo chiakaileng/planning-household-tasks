@@ -29,7 +29,7 @@ export function RecipePageManage({ recipe }: { recipe: SavedRecipe }) {
       body: JSON.stringify({ draft }),
     });
     const result = await readApiJson<{ recipe?: SavedRecipe; error?: string }>(response);
-    if (result.recipe) {
+    if ("recipe" in result && result.recipe) {
       setSourceUrl(result.recipe.sourceUrl ?? "");
       setSourceText(result.recipe.sourceText ?? "");
       return true;
