@@ -2,13 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MealPeopleFields } from "@/app/MealPeopleFields";
+import { readApiJson } from "@/app/readApiJson";
 import type { SavedMember } from "@/domain/member/SavedMember";
 import type { PlannedMeal } from "@/domain/plan/PlannedMeal";
+import { WeekSlices } from "@/domain/plan/WeekSlices";
+
+const weekSlices = new WeekSlices();
 
 type WeekPayload = {
   weekStart: string;
   days: string[];
   meals: PlannedMeal[];
+  boardDays: string[];
 };
 
 export function AssignRecipeToMeal({ recipeId }: { recipeId: string }) {
@@ -25,9 +30,16 @@ export function AssignRecipeToMeal({ recipeId }: { recipeId: string }) {
     void Promise.all([
       fetch("/api/members").then((response) => response.json()),
       fetch("/api/week").then((response) => response.json()),
-    ]).then(([memberData, weekData]: [{ members: SavedMember[] }, WeekPayload]) => {
+    ]).then(async ([memberData, weekData]: [{ members: SavedMember[] }, WeekPayload]) => {
       setMembers(memberData.members);
-      setWeek(weekData);
+      const nextStart = shiftIso(weekData.weekStart, 7);
+      const nextWeek = (await fetch(`/api/week?start=${nextStart}`).then((response) => response.json())) as WeekPayload;
+      setWeek({
+        weekStart: weekData.weekStart,
+        days: weekSlices.mergeDays(weekData.days, nextWeek.days),
+        meals: weekSlices.mergeMeals(weekData.meals, nextWeek.meals),
+        boardDays: weekData.days,
+      });
       setDate(weekData.days[0] ?? "");
     });
   }, []);
@@ -55,6 +67,7 @@ export function AssignRecipeToMeal({ recipeId }: { recipeId: string }) {
           contentType: "recipe",
           recipeId,
           sourceMealId: null,
+          sourceDishId: null,
           leftoverText: null,
           freeformText: null,
           cookMemberId: cookId,
@@ -62,28 +75,37 @@ export function AssignRecipeToMeal({ recipeId }: { recipeId: string }) {
         },
       }),
     });
-    const result = (await response.json()) as { kind?: string; error?: string };
-    setMessage(result.kind === "saved" ? "Added to that meal." : (result.error ?? "Could not add."));
+    const result = await readApiJson<{ kind?: string; error?: string }>(response);
+    const dest = week?.meals.find((meal) => meal.id === mealId);
+    const onNextWeek = dest && week ? weekSlices.isAfterWeek(dest.date, week.boardDays) : false;
+    setMessage(
+      "kind" in result && result.kind === "saved"
+        ? onNextWeek
+          ? "Added to next week."
+          : "Added to that meal."
+        : (result.error ?? "Could not add."),
+    );
     setBusy(false);
   }
 
   return (
     <section className="review">
       <h2 className="section-title">Add to a meal</h2>
-      <p className="caption">This recipe is content for a meal — pick the day and slot.</p>
+      <p className="caption">This recipe is content for a meal — pick the day and slot. Next week is in the day list.</p>
       {week ? (
         <label>
           Day
           <select className="field" value={date} onChange={(event) => setDate(event.target.value)}>
             {week.days.map((day) => (
               <option key={day} value={day}>
+                {weekSlices.isAfterWeek(day, week.boardDays) ? "Next · " : ""}
                 {dayLabel(day)}
               </option>
             ))}
           </select>
         </label>
       ) : (
-        <p className="caption">Loading this week…</p>
+        <p className="caption">Loading this week and next…</p>
       )}
       <label>
         Meal
@@ -102,12 +124,20 @@ export function AssignRecipeToMeal({ recipeId }: { recipeId: string }) {
         onEaters={setEaterIds}
         onCook={setCookId}
       />
-      <button type="button" className="btn" disabled={busy || members.length === 0} onClick={() => void assign()}>
+      <button type="button" className="btn" disabled={busy} onClick={() => void assign()}>
         Add to meal
       </button>
-      {message ? <p className="status status-ok">{message}</p> : null}
+      {message ? (
+        <p className={`status ${message.startsWith("Added") ? "status-ok" : ""}`}>{message}</p>
+      ) : null}
     </section>
   );
+}
+
+function shiftIso(iso: string, days: number): string {
+  const date = new Date(`${iso}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function dayLabel(iso: string): string {

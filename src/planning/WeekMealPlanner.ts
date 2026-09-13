@@ -3,6 +3,7 @@ import type { AppConfig } from "@/config/AppConfig";
 import { CalendarDate } from "@/domain/plan/CalendarDate";
 import type { DishDraft } from "@/domain/plan/DishDraft";
 import type { ExtraMealTemplate } from "@/domain/plan/ExtraMealPlacement";
+import { LeftoverSourceHorizon } from "@/domain/plan/LeftoverSourceHorizon";
 import { LeftoverWindow } from "@/domain/plan/LeftoverWindow";
 import type { LeftoverSourceMeal, PlannedDish, PlannedMeal } from "@/domain/plan/PlannedMeal";
 import { WeekRange } from "@/domain/plan/WeekRange";
@@ -12,6 +13,7 @@ export class WeekMealPlanner {
   readonly calendar: CalendarDate;
   readonly weeks: WeekRange;
   readonly leftovers: LeftoverWindow;
+  private readonly leftoverHorizon: LeftoverSourceHorizon;
 
   constructor(
     config: AppConfig,
@@ -20,6 +22,7 @@ export class WeekMealPlanner {
     this.calendar = new CalendarDate(config.weekTimeZone);
     this.weeks = new WeekRange(this.calendar, config.weekStartsOn);
     this.leftovers = new LeftoverWindow(this.calendar, config.leftoverLookbackDays);
+    this.leftoverHorizon = new LeftoverSourceHorizon(this.leftovers, this.weeks);
   }
 
   defaultSlots() {
@@ -40,7 +43,8 @@ export class WeekMealPlanner {
 
   async leftoverSources(now: Date = new Date()): Promise<LeftoverSourceMeal[]> {
     const today = this.calendar.today(now);
-    return this.meals.leftoverSources(this.leftovers.firstDate(today), today);
+    const { from, to } = this.leftoverHorizon.range(today);
+    return this.meals.leftoverSources(from, to);
   }
 
   async addDish(mealId: string, draft: DishDraft): Promise<PlannedDish> {
@@ -48,9 +52,9 @@ export class WeekMealPlanner {
     return this.meals.addDish(mealId, draft);
   }
 
-  async updateDish(dishId: string, draft: DishDraft): Promise<PlannedDish | null> {
+  async updateDish(dishId: string, draft: DishDraft, mealId?: string | null): Promise<PlannedDish | null> {
     await this.assertLeftoverInWindow(draft);
-    return this.meals.updateDish(dishId, draft);
+    return this.meals.updateDish(dishId, draft, mealId);
   }
 
   removeDish(dishId: string): Promise<boolean> {
@@ -71,8 +75,12 @@ export class WeekMealPlanner {
       return;
     }
     const sources = await this.leftoverSources();
-    if (!sources.some((source) => source.id === draft.sourceMealId)) {
+    const source = sources.find((item) => item.id === draft.sourceMealId);
+    if (!source) {
       throw new Error("Leftovers can only come from meals in the last few days.");
+    }
+    if (draft.sourceDishId && !source.dishes.some((dish) => dish.id === draft.sourceDishId)) {
+      throw new Error("Pick which dish these leftovers are from.");
     }
   }
 }

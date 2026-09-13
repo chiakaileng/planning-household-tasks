@@ -7,6 +7,7 @@ import { readApiJson } from "@/app/readApiJson";
 import { RecipeEmojiAssigner } from "@/domain/recipe/RecipeEmojiAssigner";
 import type { RecipeDraft } from "@/domain/recipe/RecipeDraft";
 import type { SavedRecipe } from "@/domain/recipe/SavedRecipe";
+import { RecipeLinkDraft } from "@/domain/recipe/RecipeLinkDraft";
 import { RecipeRefreshMerger } from "@/domain/recipe/RecipeRefreshMerger";
 import type { ExtractFromPasteResult, ImportFromUrlResult, LlmCostSnapshot } from "@/ingestion/ImportResults";
 
@@ -71,11 +72,15 @@ export const RecipeIngestPanel = forwardRef<
           : "Check the draft below, then save. Extraction is not trusted until you confirm.",
       );
     } else {
-      setDraft(null);
       if (result.kind === "extraction_failed") {
         applyCost(result.cost);
       }
-      setMessage(result.message);
+      if (url.trim()) {
+        offerLinkOnlyDraft(url, result.message);
+      } else {
+        setDraft(null);
+        setMessage(result.message);
+      }
     }
     setBusy(false);
   }
@@ -95,11 +100,36 @@ export const RecipeIngestPanel = forwardRef<
       );
       return;
     }
-    setDraft(null);
+    offerLinkOnlyDraft(url, result.message);
     if (result.kind === "extraction_failed") {
       applyCost(result.cost);
     }
-    setMessage(result.message);
+  }
+
+  function offerLinkOnlyDraft(rawUrl: string, failure: string) {
+    const stub = linkDrafts.fromUrl(rawUrl);
+    if (!stub) {
+      setDraft(null);
+      setMessage(failure);
+      return;
+    }
+    const next = ensureHouseholdFields(stub);
+    setDraft(next);
+    void flagIfDuplicate(next);
+    setMessage(`${failure} You can still save the title and URL as a link.`);
+  }
+
+  function saveAsLink() {
+    const stub = linkDrafts.fromUrl(url);
+    if (!stub) {
+      setMessage("Add a URL first.");
+      return;
+    }
+    const next = ensureHouseholdFields(stub);
+    setDraft(next);
+    setDuplicate(null);
+    void flagIfDuplicate(next);
+    setMessage("No extract needed. Edit the title if you want, then save to keep the link.");
   }
 
   function applyCost(next: LlmCostSnapshot | null) {
@@ -245,6 +275,9 @@ export const RecipeIngestPanel = forwardRef<
         <button className="btn" type="button" onClick={() => void importUrl()} disabled={busy}>
           Import URL
         </button>
+        <button className="btn btn-quiet" type="button" onClick={saveAsLink} disabled={busy || !url.trim()}>
+          Save as link
+        </button>
       </div>
       <h3 className="list-title">Or paste text</h3>
       <textarea
@@ -277,6 +310,7 @@ export const RecipeIngestPanel = forwardRef<
 });
 
 const refreshMerger = new RecipeRefreshMerger();
+const linkDrafts = new RecipeLinkDraft();
 
 function formatUsd(value: number): string {
   return `$${value.toFixed(4)}`;

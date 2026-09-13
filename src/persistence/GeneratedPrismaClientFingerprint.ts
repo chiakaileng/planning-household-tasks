@@ -1,5 +1,5 @@
-import { existsSync, statSync } from "node:fs";
-import path from "node:path";
+import { existsSync, statSync } from "fs";
+import path from "path";
 
 /**
  * Identity of the generated Prisma client on disk.

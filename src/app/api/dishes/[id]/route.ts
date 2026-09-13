@@ -5,16 +5,13 @@ import { createWeekMealPlanner } from "@/lib/createImporter";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = (await request.json()) as { draft?: Partial<DishDraft> };
+  const body = (await request.json()) as { mealId?: string; draft?: Partial<DishDraft> };
   const draft = parseDishDraft(body.draft);
   if (!draft) {
-    return NextResponse.json(
-      { error: "Pick at least one eater and who cooks." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Say what the dish is." }, { status: 400 });
   }
   try {
-    const dish = await createWeekMealPlanner().updateDish(id, draft);
+    const dish = await createWeekMealPlanner().updateDish(id, draft, body.mealId);
     if (!dish) {
       return NextResponse.json({ error: "That dish is not on the week." }, { status: 404 });
     }

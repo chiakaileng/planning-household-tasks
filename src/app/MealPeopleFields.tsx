@@ -26,7 +26,7 @@ export function MealPeopleFields({
   return (
     <>
       <fieldset className="choice-set">
-        <legend>Who eats</legend>
+        <legend>Who eats (optional)</legend>
         {members.map((member) => (
           <label key={member.id} className="choice">
             <input
@@ -39,9 +39,9 @@ export function MealPeopleFields({
         ))}
       </fieldset>
       <label>
-        Who cooks
+        Who cooks (optional)
         <select className="field" value={cookId} onChange={(event) => onCook(event.target.value)}>
-          <option value="">Pick someone</option>
+          <option value="">No cook yet</option>
           {members.map((member) => (
             <option key={member.id} value={member.id}>
               {member.name}

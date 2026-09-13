@@ -1,5 +1,5 @@
-import { createRequire } from "node:module";
-import path from "node:path";
+import { createRequire } from "module";
+import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { GeneratedPrismaClientFingerprint } from "@/persistence/GeneratedPrismaClientFingerprint";
 

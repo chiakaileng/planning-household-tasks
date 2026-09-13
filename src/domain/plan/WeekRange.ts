@@ -29,4 +29,13 @@ export class WeekRange {
     const start = this.startOfWeek(weekStart);
     return Array.from({ length: 7 }, (_, index) => this.calendar.addDays(start, index));
   }
+
+  lastDay(weekStart: string): string {
+    const days = this.days(weekStart);
+    return days[days.length - 1] ?? this.startOfWeek(weekStart);
+  }
+
+  nextWeekStart(weekStart: string): string {
+    return this.calendar.addDays(this.lastDay(weekStart), 1);
+  }
 }

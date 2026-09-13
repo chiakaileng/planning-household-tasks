@@ -72,28 +72,50 @@ export class MealPlanRepository implements IMealPlanRepository {
       _max: { sortOrder: true },
     });
     const created = await this.db.mealDish.create({
-      data: {
+      data: dishRelationData(prepared.fields, {
         mealId,
-        ...prepared.fields,
         sortOrder: (last._max.sortOrder ?? -1) + 1,
-        eaters: { create: prepared.eaters },
-      },
-      include: dishInclude,
+        creating: true,
+      }),
     });
-    return toPlannedDish(created);
+    if (prepared.eaters.length > 0) {
+      await this.db.mealDishEater.createMany({
+        data: prepared.eaters.map((eater) => ({ ...eater, dishId: created.id })),
+      });
+    }
+    const loaded = await this.db.mealDish.findUnique({ where: { id: created.id }, include: dishInclude });
+    return toPlannedDish(loaded!);
   }
 
-  async updateDish(dishId: string, draft: DishDraft): Promise<PlannedDish | null> {
+  async updateDish(dishId: string, draft: DishDraft, mealId?: string | null): Promise<PlannedDish | null> {
     const existing = await this.db.mealDish.findUnique({ where: { id: dishId } });
     if (!existing) {
       return null;
     }
     const prepared = await this.prepareDish(draft);
+    let nextMealId = existing.mealId;
+    if (mealId && mealId !== existing.mealId) {
+      const meal = await this.db.meal.findUnique({ where: { id: mealId } });
+      if (!meal) {
+        throw new Error("That meal is not on the week.");
+      }
+      nextMealId = mealId;
+    }
+    const moved = nextMealId !== existing.mealId;
+    const last = moved
+      ? await this.db.mealDish.aggregate({
+          where: { mealId: nextMealId },
+          _max: { sortOrder: true },
+        })
+      : null;
     await this.db.$transaction(async (tx) => {
       await tx.mealDishEater.deleteMany({ where: { dishId } });
       await tx.mealDish.update({
         where: { id: dishId },
-        data: prepared.fields,
+        data: dishRelationData(
+          prepared.fields,
+          moved ? { mealId: nextMealId, sortOrder: (last?._max.sortOrder ?? -1) + 1 } : null,
+        ),
       });
       await tx.mealDishEater.createMany({
         data: prepared.eaters.map((eater) => ({ ...eater, dishId })),
@@ -147,13 +169,16 @@ export class MealPlanRepository implements IMealPlanRepository {
         date: { gte: fromDate, lte: toDate },
         dishes: { some: {} },
       },
+      include: { dishes: { orderBy: { sortOrder: "asc" } } },
       orderBy: [{ date: "desc" }, { sortOrder: "asc" }],
     });
     return rows.map((row) => ({
       id: row.id,
       date: row.date,
+      slotKey: row.slotKey,
       name: row.name,
       label: this.content.leftoverMealLabel(row.name, row.date),
+      dishes: row.dishes.map((dish) => ({ id: dish.id, title: dish.titleSnapshot })),
     }));
   }
 
@@ -173,25 +198,24 @@ export class MealPlanRepository implements IMealPlanRepository {
       contentType: string;
       recipeId: string | null;
       sourceMealId: string | null;
+      sourceDishId: string | null;
       leftoverText: string | null;
       freeformText: string | null;
       titleSnapshot: string;
-      cookMemberId: string;
+      cookMemberId: string | null;
       cookNameSnapshot: string;
     };
     eaters: { memberId: string; nameSnapshot: string }[];
   }> {
-    if (draft.eaterMemberIds.length === 0) {
-      throw new Error("Pick at least one eater.");
-    }
-    const uniqueEaterIds = [...new Set(draft.eaterMemberIds)];
+    const uniqueEaterIds = [...new Set(draft.eaterMemberIds.filter((id) => id.trim().length > 0))];
+    const cookId = draft.cookMemberId.trim();
     const members = await this.db.member.findMany({
-      where: { id: { in: [...uniqueEaterIds, draft.cookMemberId] } },
+      where: { id: { in: [...uniqueEaterIds, ...(cookId ? [cookId] : [])] } },
     });
     const byId = new Map(members.map((member) => [member.id, member]));
-    const cook = byId.get(draft.cookMemberId);
-    if (!cook) {
-      throw new Error("Pick who cooks.");
+    const cook = cookId ? byId.get(cookId) : undefined;
+    if (cookId && !cook) {
+      throw new Error("That cook is not on the household list.");
     }
     const eaters = uniqueEaterIds.map((id) => {
       const member = byId.get(id);
@@ -204,6 +228,7 @@ export class MealPlanRepository implements IMealPlanRepository {
     let contentType = draft.contentType;
     let leftoverText = emptyToNull(draft.leftoverText);
     let sourceMealId = draft.sourceMealId;
+    let sourceDishId = draft.sourceDishId;
     let recipeTitle: string | null = null;
     let sourceMealLabel: string | null = null;
 
@@ -222,6 +247,9 @@ export class MealPlanRepository implements IMealPlanRepository {
       if (!draft.sourceMealId) {
         throw new Error("Pick which meal these leftovers are from.");
       }
+      if (!draft.sourceDishId) {
+        throw new Error("Pick which dish these leftovers are from.");
+      }
       const source = await this.db.meal.findUnique({
         where: { id: draft.sourceMealId },
         include: { dishes: true },
@@ -229,23 +257,30 @@ export class MealPlanRepository implements IMealPlanRepository {
       if (!source || source.dishes.length === 0) {
         throw new Error("That leftover source is not a planned meal.");
       }
-      sourceMealLabel = this.content.leftoverMealLabel(source.name, source.date);
+      const sourceDish = source.dishes.find((dish) => dish.id === draft.sourceDishId);
+      if (!sourceDish) {
+        throw new Error("Pick which dish these leftovers are from.");
+      }
+      sourceMealLabel = this.content.leftoverDishLabel(sourceDish.titleSnapshot);
     }
 
     const error = this.content.validate({
       contentType: draft.contentType,
       recipeId: draft.recipeId,
       sourceMealId: draft.sourceMealId,
+      sourceDishId: draft.sourceDishId,
       leftoverText: draft.leftoverText,
       freeformText: draft.freeformText,
+      freeformTitle: draft.freeformTitle,
     });
     if (error) {
       throw new Error(error);
     }
 
-    if (contentType === "leftovers_meal" && !sourceMealId) {
+    if (contentType === "leftovers_meal" && (!sourceMealId || !sourceDishId)) {
       contentType = "leftovers_text";
       leftoverText = leftoverText ?? sourceMealLabel;
+      sourceDishId = null;
     }
 
     return {
@@ -253,6 +288,7 @@ export class MealPlanRepository implements IMealPlanRepository {
         contentType,
         recipeId: draft.contentType === "recipe" ? draft.recipeId : null,
         sourceMealId: contentType === "leftovers_meal" ? sourceMealId : null,
+        sourceDishId: contentType === "leftovers_meal" ? sourceDishId : null,
         leftoverText: contentType === "leftovers_text" ? leftoverText : null,
         freeformText: draft.contentType === "freeform" ? emptyToNull(draft.freeformText) : null,
         titleSnapshot: this.content.title(
@@ -262,11 +298,12 @@ export class MealPlanRepository implements IMealPlanRepository {
             sourceMealId,
             leftoverText,
             freeformText: draft.freeformText,
+            freeformTitle: draft.freeformTitle,
           },
           { recipeTitle, sourceMealLabel },
         ),
-        cookMemberId: cook.id,
-        cookNameSnapshot: cook.name,
+        cookMemberId: cook?.id ?? null,
+        cookNameSnapshot: cook?.name ?? "",
       },
       eaters,
     };
@@ -287,8 +324,9 @@ type DishRow = {
   mealId: string;
   contentType: string;
   recipeId: string | null;
-  recipe: { title: string } | null;
+  recipe: { title: string; sourceUrl: string | null } | null;
   sourceMealId: string | null;
+  sourceDishId: string | null;
   leftoverText: string | null;
   freeformText: string | null;
   titleSnapshot: string;
@@ -334,7 +372,9 @@ function toPlannedDish(row: DishRow): PlannedDish {
     contentType,
     recipeId: row.recipeId,
     recipeMissing,
+    sourceUrl: row.recipe?.sourceUrl ?? null,
     sourceMealId: row.sourceMealId,
+    sourceDishId: row.sourceDishId,
     leftoverText: row.leftoverText,
     freeformText: row.freeformText,
     title: row.titleSnapshot,
@@ -342,6 +382,35 @@ function toPlannedDish(row: DishRow): PlannedDish {
     cookName: row.cookNameSnapshot,
     eaters,
     sortOrder: row.sortOrder,
+  };
+}
+
+function dishRelationData(
+  fields: {
+    contentType: string;
+    recipeId: string | null;
+    sourceMealId: string | null;
+    sourceDishId: string | null;
+    leftoverText: string | null;
+    freeformText: string | null;
+    titleSnapshot: string;
+    cookMemberId: string | null;
+    cookNameSnapshot: string;
+  },
+  meal: { mealId: string; sortOrder: number; creating?: boolean } | null,
+) {
+  const creating = meal?.creating === true;
+  return {
+    contentType: fields.contentType,
+    leftoverText: fields.leftoverText,
+    freeformText: fields.freeformText,
+    titleSnapshot: fields.titleSnapshot,
+    cookNameSnapshot: fields.cookNameSnapshot,
+    sourceDishId: fields.sourceDishId,
+    recipe: fields.recipeId ? { connect: { id: fields.recipeId } } : creating ? undefined : { disconnect: true },
+    sourceMeal: fields.sourceMealId ? { connect: { id: fields.sourceMealId } } : creating ? undefined : { disconnect: true },
+    cook: fields.cookMemberId ? { connect: { id: fields.cookMemberId } } : creating ? undefined : { disconnect: true },
+    ...(meal ? { meal: { connect: { id: meal.mealId } }, sortOrder: meal.sortOrder } : {}),
   };
 }
 

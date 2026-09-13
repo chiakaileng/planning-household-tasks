@@ -109,6 +109,7 @@ model MealDish {
   recipe           Recipe?         @relation(fields: [recipeId], references: [id], onDelete: SetNull)
   sourceMealId     String?
   sourceMeal       Meal?           @relation("LeftoverSource", fields: [sourceMealId], references: [id], onDelete: SetNull)
+  sourceDishId     String?
   leftoverText     String?
   freeformText     String?
   titleSnapshot    String

@@ -79,8 +79,9 @@ describe("MealPlanRepository", () => {
     const leftoverMeal = await meals.addDish(breakfast!.id, people(adult.id, [kid.id], {
       contentType: "leftovers_meal",
       sourceMealId: lunch!.id,
+      sourceDishId: recipeDish.id,
     }));
-    expect(leftoverMeal.title).toContain("Leftovers");
+    expect(leftoverMeal.title).toBe("Leftovers: Test noodles");
 
     const leftoverText = await meals.addDish(breakfast!.id, people(adult.id, [adult.id], {
       contentType: "leftovers_text",
@@ -95,9 +96,17 @@ describe("MealPlanRepository", () => {
     expect(takeaway.title).toBe("McDonald's");
     expect(takeaway.cookMemberId).toBe(kid.id);
 
+    const eatersOnly = await meals.addDish(breakfast!.id, people("", [adult.id], {
+      contentType: "freeform",
+      freeformText: "Takeaway noodles",
+    }));
+    expect(eatersOnly.title).toBe("Takeaway noodles");
+    expect(eatersOnly.cookMemberId).toBeNull();
+    expect(eatersOnly.eaters.map((eater) => eater.memberId)).toEqual([adult.id]);
+
     const listed = await meals.listWeek("2099-01-05");
     const savedBreakfast = listed.find((meal) => meal.id === breakfast!.id);
-    expect(savedBreakfast?.dishes).toHaveLength(3);
+    expect(savedBreakfast?.dishes).toHaveLength(4);
 
     await expect(meals.addDish(breakfast!.id, people(adult.id, [adult.id], { contentType: "freeform", freeformText: "   " }))).rejects.toThrow();
 
@@ -113,6 +122,52 @@ describe("MealPlanRepository", () => {
     const later = await meals.ensureWeek("2099-01-12");
     expect(later.some((meal) => meal.name === "Snack")).toBe(true);
     expect(later.find((meal) => meal.name === "Snack")?.dishes).toEqual([]);
+
+    const turnedLeftover = await meals.updateDish(
+      takeaway.id,
+      people(kid.id, [kid.id], {
+        contentType: "leftovers_meal",
+        sourceMealId: lunch!.id,
+        sourceDishId: recipeDish.id,
+      }),
+    );
+    expect(turnedLeftover?.title).toBe("Leftovers: Test noodles");
+    expect(turnedLeftover?.contentType).toBe("leftovers_meal");
+    expect(turnedLeftover?.sourceDishId).toBe(recipeDish.id);
+    expect(turnedLeftover?.recipeId).toBeNull();
+  });
+
+  it("moves a dish onto another meal, including next week", async () => {
+    const thisWeek = await meals.ensureWeek("2099-02-03");
+    const nextWeek = await meals.ensureWeek("2099-02-10");
+    const mondayDinner = thisWeek.find((meal) => meal.date === "2099-02-02" && meal.slotKey === "dinner");
+    const nextMondayDinner = nextWeek.find((meal) => meal.date === "2099-02-09" && meal.slotKey === "dinner");
+    expect(mondayDinner && nextMondayDinner).toBeTruthy();
+
+    const adult = await members.create({
+      name: `Mover Adult ${Date.now()}`,
+      lifeStage: "adult",
+      avatarMode: "initials",
+      avatarPresetKey: null,
+    });
+    createdMemberIds.push(adult.id);
+
+    const dish = await meals.addDish(
+      mondayDinner!.id,
+      people(adult.id, [adult.id], { contentType: "freeform", freeformText: "Laksa" }),
+    );
+    const moved = await meals.updateDish(
+      dish.id,
+      people(adult.id, [adult.id], { contentType: "freeform", freeformText: "Laksa" }),
+      nextMondayDinner!.id,
+    );
+    expect(moved?.id).toBe(dish.id);
+    expect(moved?.title).toBe("Laksa");
+
+    const listedThis = await meals.listWeek("2099-02-02");
+    const listedNext = await meals.listWeek("2099-02-09");
+    expect(listedThis.find((meal) => meal.id === mondayDinner!.id)?.dishes.map((item) => item.id)).not.toContain(dish.id);
+    expect(listedNext.find((meal) => meal.id === nextMondayDinner!.id)?.dishes.map((item) => item.id)).toContain(dish.id);
   });
 });
 
@@ -125,6 +180,7 @@ function people(
     contentType: "freeform",
     recipeId: null,
     sourceMealId: null,
+    sourceDishId: null,
     leftoverText: null,
     freeformText: null,
     cookMemberId,

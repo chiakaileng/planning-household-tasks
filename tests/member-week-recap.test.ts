@@ -11,6 +11,7 @@ function dish(overrides: Partial<PlannedDish> & Pick<PlannedDish, "id" | "mealId
     recipeId: "recipe-1",
     recipeMissing: false,
     sourceMealId: null,
+    sourceDishId: null,
     leftoverText: null,
     freeformText: null,
     title: "Noodles",
@@ -18,6 +19,7 @@ function dish(overrides: Partial<PlannedDish> & Pick<PlannedDish, "id" | "mealId
     cookName: "Ada",
     eaters: [{ memberId: "kid", name: "Kai" }],
     sortOrder: 0,
+    sourceUrl: null,
     ...overrides,
   };
 }

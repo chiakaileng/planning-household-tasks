@@ -68,6 +68,7 @@ Times and timezone live in env. Defaults: weekly **Sunday 19:00**, night-before 
 ## Notes
 
 - Never commit `.env`. Example keys only in `.env.example`.
+- A recipe URL is an HTML link on the dish title. Sends disable Telegram’s page preview so no thumbnail.
 - Sunday may send both the weekly plan (19:00) and the Monday reminder (20:00).
 - Inbound recipes via webhook need a public HTTPS host **and** the same database as the planner. Out of this task; free hosts exist (Cloudflare Workers, Vercel) but would not write to local SQLite on their own.
 - Locked weekly copy (placeholders):

@@ -9,7 +9,9 @@ export type PlannedDish = {
   contentType: string;
   recipeId: string | null;
   recipeMissing: boolean;
+  sourceUrl: string | null;
   sourceMealId: string | null;
+  sourceDishId: string | null;
   leftoverText: string | null;
   freeformText: string | null;
   title: string;
@@ -29,9 +31,16 @@ export type PlannedMeal = {
   dishes: PlannedDish[];
 };
 
+export type LeftoverSourceDish = {
+  id: string;
+  title: string;
+};
+
 export type LeftoverSourceMeal = {
   id: string;
   date: string;
+  slotKey: string;
   name: string;
   label: string;
+  dishes: LeftoverSourceDish[];
 };

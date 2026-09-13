@@ -16,7 +16,13 @@ export class TelegramBotSender implements ITelegramSender {
       const response = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: this.config.telegramChatId, text }),
+        body: JSON.stringify({
+          chat_id: this.config.telegramChatId,
+          text,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+          link_preview_options: { is_disabled: true },
+        }),
         signal: AbortSignal.timeout(this.config.telegramSendTimeoutMs),
       });
       const body = (await response.json()) as { ok?: boolean; description?: string };

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { startTelegramInboundPoller } from "@/announce/startTelegramInboundPoller";
 import { AppConfig } from "@/config/AppConfig";
 import { createTelegramAnnouncer } from "@/lib/createTelegramAnnouncer";
+
+startTelegramInboundPoller();
 
 export async function POST(request: Request) {
   const config = new AppConfig();

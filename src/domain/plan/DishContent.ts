@@ -4,8 +4,10 @@ export type DishContentInput = {
   contentType: DishContentType;
   recipeId: string | null;
   sourceMealId: string | null;
+  sourceDishId?: string | null;
   leftoverText: string | null;
   freeformText: string | null;
+  freeformTitle?: string | null;
 };
 
 /**
@@ -25,11 +27,22 @@ export class DishContent {
     if (input.contentType === "leftovers_text") {
       return trimOrEmpty(input.leftoverText);
     }
-    return trimOrEmpty(input.freeformText);
+    const named = trimOrEmpty(input.freeformTitle);
+    if (named) {
+      return named;
+    }
+    const body = trimOrEmpty(input.freeformText);
+    const first = body.split(/\r?\n/, 1)[0]?.trim() ?? "";
+    return first || body;
   }
 
   leftoverMealLabel(mealName: string, mealDate: string): string {
     return `Leftovers: ${mealName} · ${mealDate}`;
+  }
+
+  leftoverDishLabel(dishTitle: string): string {
+    const title = dishTitle.trim() || "Leftovers";
+    return title.toLowerCase().startsWith("leftovers") ? title : `Leftovers: ${title}`;
   }
 
   validate(input: DishContentInput): string | null {
@@ -38,6 +51,9 @@ export class DishContent {
     }
     if (input.contentType === "leftovers_meal" && !input.sourceMealId) {
       return "Pick which meal these leftovers are from.";
+    }
+    if (input.contentType === "leftovers_meal" && !input.sourceDishId) {
+      return "Pick which dish these leftovers are from.";
     }
     if (input.contentType === "leftovers_text" && !trimOrEmpty(input.leftoverText)) {
       return "Write what the leftovers are.";

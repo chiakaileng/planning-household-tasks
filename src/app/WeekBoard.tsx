@@ -13,10 +13,13 @@ import { RecipeEmojiAssigner } from "@/domain/recipe/RecipeEmojiAssigner";
 import type { SavedMember } from "@/domain/member/SavedMember";
 import type { DishContentType } from "@/domain/plan/DishContentType";
 import { DishPeopleCaption } from "@/domain/plan/DishPeopleCaption";
+import { LeftoverSourceFields } from "@/app/LeftoverSourceFields";
+import { LeftoverSourceChoice } from "@/domain/plan/LeftoverSourceChoice";
 import type { LeftoverSourceMeal, PlannedDish, PlannedMeal } from "@/domain/plan/PlannedMeal";
 import type { RecapLens } from "@/domain/plan/RecapRoleFilter";
 import { RecapWatchList } from "@/domain/plan/RecapWatchList";
 import { RecapWatchListStorage } from "@/domain/plan/RecapWatchListStorage";
+import { WeekSlices } from "@/domain/plan/WeekSlices";
 import { RecipeNutritionSummary } from "@/domain/recipe/RecipeNutritionSummary";
 import { RecipeTagFilter } from "@/domain/recipe/RecipeTagFilter";
 import type { SavedRecipe } from "@/domain/recipe/SavedRecipe";
@@ -29,6 +32,7 @@ type Composer = {
   recipeId: string | null;
   recipeTitle: string;
   sourceMealId: string | null;
+  sourceDishId: string | null;
   leftoverText: string;
   freeformText: string;
   eaterIds: string[];
@@ -43,6 +47,8 @@ const tagFilterLogic = new RecipeTagFilter();
 const dishPeople = new DishPeopleCaption();
 const recapWatch = new RecapWatchList();
 const recapStorage = typeof window === "undefined" ? null : new RecapWatchListStorage(window.localStorage, recapWatchListKey);
+const weekSlices = new WeekSlices();
+const leftoverChoice = new LeftoverSourceChoice();
 
 export function WeekBoard({
   initialWeekStart,
@@ -71,6 +77,8 @@ export function WeekBoard({
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [recipes, setRecipes] = useState(initialRecipes);
   const [composer, setComposer] = useState<Composer | null>(null);
+  const [composerDays, setComposerDays] = useState(initialDays);
+  const [composerMeals, setComposerMeals] = useState(initialMeals);
   const [extraName, setExtraName] = useState("");
   const [extraAfter, setExtraAfter] = useState(defaultSlots[0]?.key ?? "breakfast");
   const [extraRecurs, setExtraRecurs] = useState(false);
@@ -138,23 +146,59 @@ export function WeekBoard({
     const leftoverResponse = await fetch("/api/week/leftovers");
     const leftoverData = (await leftoverResponse.json()) as { sources: LeftoverSourceMeal[] };
     setLeftovers(leftoverData.sources);
+    setComposerDays(data.days);
+    setComposerMeals(data.meals);
   }
 
+  async function loadComposerWeeks() {
+    const response = await fetch(`/api/week?start=${shiftWeek(weekStart, 7)}`);
+    const next = (await response.json()) as { days: string[]; meals: PlannedMeal[] };
+    setComposerDays(weekSlices.mergeDays(days, next.days));
+    setComposerMeals(weekSlices.mergeMeals(meals, next.meals));
+  }
+
+  useEffect(() => {
+    void loadComposerWeeks();
+  }, [weekStart, days, meals]);
+
+  useEffect(() => {
+    setComposer((current) => {
+      if (!current || current.contentType !== "leftovers_meal") {
+        return current;
+      }
+      const next = leftoverPick(leftovers, composerMeals, current.mealId, current.editingDishId, current.sourceMealId, current.sourceDishId);
+      if (next.sourceMealId === current.sourceMealId && next.sourceDishId === current.sourceDishId) {
+        return current;
+      }
+      return { ...current, ...next };
+    });
+  }, [leftovers, composerMeals]);
+
   function openComposer(mealId: string, partial: Partial<Composer> = {}) {
+    const leftover = leftoverPick(
+      leftovers,
+      composerMeals,
+      mealId,
+      partial.editingDishId ?? null,
+      partial.sourceMealId ?? null,
+      partial.sourceDishId ?? null,
+    );
     setComposer({
       mealId,
       contentType: "freeform",
       recipeId: null,
       recipeTitle: "",
-      sourceMealId: leftovers[0]?.id ?? null,
       leftoverText: "",
       freeformText: "",
       eaterIds: [],
       cookId: "",
       editingDishId: null,
       ...partial,
+      sourceMealId: leftover.sourceMealId,
+      sourceDishId: leftover.sourceDishId,
     });
     setMessage(null);
+    void loadComposerWeeks();
   }
 
   function editDish(meal: PlannedMeal, dish: PlannedDish) {
@@ -163,6 +207,7 @@ export function WeekBoard({
       recipeId: dish.recipeId,
       recipeTitle: dish.title,
       sourceMealId: dish.sourceMealId,
+      sourceDishId: dish.sourceDishId,
       leftoverText: dish.leftoverText ?? "",
       freeformText: dish.freeformText ?? "",
       eaterIds: dish.eaters.map((eater) => eater.memberId).filter((id): id is string => Boolean(id)),
@@ -181,38 +226,45 @@ export function WeekBoard({
       contentType: composer.contentType,
       recipeId: composer.recipeId,
       sourceMealId: composer.sourceMealId,
+      sourceDishId: composer.sourceDishId,
       leftoverText: composer.leftoverText,
       freeformText: composer.freeformText,
       cookMemberId: composer.cookId,
       eaterMemberIds: composer.eaterIds,
     };
-    const response = await fetch(
-      composer.editingDishId ? `/api/dishes/${composer.editingDishId}` : "/api/week/dishes",
-      {
-        method: composer.editingDishId ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mealId: composer.mealId, draft }),
-      },
-    );
-    const result = (await response.json()) as { kind?: string; error?: string };
-    if (result.kind === "saved") {
-      await loadWeek(weekStart);
-      setComposer(null);
-      setMessage("Saved on that meal.");
-    } else {
-      setMessage(result.error ?? "Could not save that dish.");
+    try {
+      const response = await fetch(
+        composer.editingDishId ? `/api/dishes/${composer.editingDishId}` : "/api/week/dishes",
+        {
+          method: composer.editingDishId ? "PATCH" : "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mealId: composer.mealId, draft }),
+        },
+      );
+      const result = await readApiJson<{ kind?: string; error?: string }>(response);
+      if ("kind" in result && result.kind === "saved") {
+        const dest = composerMeals.find((meal) => meal.id === composer.mealId);
+        await loadWeek(dest && weekSlices.isAfterWeek(dest.date, days) ? dest.date : weekStart);
+        setComposer(null);
+        setMessage(dest && weekSlices.isAfterWeek(dest.date, days) ? "Saved on next week." : "Saved on that meal.");
+      } else {
+        setMessage(result.error ?? "Could not save that dish.");
+      }
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
-  async function removeDish(dish: PlannedDish) {
+  async function removeDish(dish: PlannedDish): Promise<boolean> {
     if (!window.confirm(`Remove “${dish.title}” from this meal?`)) {
-      return;
+      return false;
     }
     setBusy(true);
     await fetch(`/api/dishes/${dish.id}`, { method: "DELETE" });
     await loadWeek(weekStart);
     setBusy(false);
+    setMessage("Removed from that meal.");
+    return true;
   }
 
   async function addExtra() {
@@ -312,7 +364,7 @@ export function WeekBoard({
     });
     const result = await readApiJson<{ kind?: string; error?: string }>(response);
     setAnnounceNote(
-      result.kind === "sent"
+      "kind" in result && result.kind === "sent"
         ? { text: kind === "weekly" ? "Sent this week to Telegram." : "Sent tomorrow to Telegram.", ok: true }
         : { text: result.error ?? "Could not send to Telegram.", ok: false },
     );
@@ -327,7 +379,7 @@ export function WeekBoard({
     }
     const response = await fetch(`/api/recipes/${recipeId}`);
     const result = await readApiJson<{ recipe?: SavedRecipe }>(response);
-    const recipe = result.recipe;
+    const recipe = "recipe" in result ? result.recipe : undefined;
     if (recipe) {
       setRecipes((current) => [recipe, ...current.filter((item) => item.id !== recipe.id)]);
       setViewingRecipe(recipe);
@@ -637,19 +689,22 @@ export function WeekBoard({
                 Day
                 <select
                   className="field"
-                  value={meals.find((meal) => meal.id === composer.mealId)?.date ?? ""}
+                  value={composerMeals.find((meal) => meal.id === composer.mealId)?.date ?? ""}
                   onChange={(event) => {
-                    const current = meals.find((meal) => meal.id === composer.mealId);
-                    const next = meals.find(
-                      (meal) => meal.date === event.target.value && meal.slotKey === (current?.slotKey ?? slotRows[0]?.key),
+                    const current = composerMeals.find((meal) => meal.id === composer.mealId);
+                    const next = composerMeals.find(
+                      (meal) =>
+                        meal.date === event.target.value &&
+                        meal.slotKey === (current?.slotKey ?? slotRows[0]?.key),
                     );
                     if (next) {
                       setComposer({ ...composer, mealId: next.id });
                     }
                   }}
                 >
-                  {days.map((day) => (
+                  {composerDays.map((day) => (
                     <option key={day} value={day}>
+                      {weekSlices.isAfterWeek(day, days) ? "Next · " : ""}
                       {weekdayLabel(day)} {dateLabel(day)}
                     </option>
                   ))}
@@ -659,22 +714,30 @@ export function WeekBoard({
                 Meal
                 <select
                   className="field"
-                  value={meals.find((meal) => meal.id === composer.mealId)?.slotKey ?? ""}
+                  value={composerMeals.find((meal) => meal.id === composer.mealId)?.slotKey ?? ""}
                   onChange={(event) => {
-                    const current = meals.find((meal) => meal.id === composer.mealId);
-                    const next = meals.find(
-                      (meal) => meal.date === (current?.date ?? days[0]) && meal.slotKey === event.target.value,
+                    const current = composerMeals.find((meal) => meal.id === composer.mealId);
+                    const next = composerMeals.find(
+                      (meal) =>
+                        meal.date === (current?.date ?? composerDays[0]) &&
+                        meal.slotKey === event.target.value,
                     );
                     if (next) {
                       setComposer({ ...composer, mealId: next.id });
                     }
                   }}
                 >
-                  {slotRows.map((slot) => (
-                    <option key={slot.key} value={slot.key}>
-                      {slot.name}
-                    </option>
-                  ))}
+                  {composerMeals
+                    .filter(
+                      (meal) =>
+                        meal.date ===
+                        (composerMeals.find((item) => item.id === composer.mealId)?.date ?? composerDays[0]),
+                    )
+                    .map((meal) => (
+                      <option key={meal.id} value={meal.slotKey}>
+                        {meal.name}
+                      </option>
+                    ))}
                 </select>
               </label>
             </div>
@@ -692,7 +755,20 @@ export function WeekBoard({
                 <input
                   type="radio"
                   checked={composer.contentType === "leftovers_meal"}
-                  onChange={() => setComposer({ ...composer, contentType: "leftovers_meal" })}
+                  onChange={() =>
+                    setComposer({
+                      ...composer,
+                      contentType: "leftovers_meal",
+                      ...leftoverPick(
+                        leftovers,
+                        composerMeals,
+                        composer.mealId,
+                        composer.editingDishId,
+                        composer.sourceMealId,
+                        composer.sourceDishId,
+                      ),
+                    })
+                  }
                 />
                 Leftovers of a recent meal
               </label>
@@ -738,24 +814,14 @@ export function WeekBoard({
               </label>
             ) : null}
             {composer.contentType === "leftovers_meal" ? (
-              leftovers.length === 0 ? (
-                <p className="flag">No meals with dishes in the leftover window yet.</p>
-              ) : (
-                <label>
-                  From
-                  <select
-                    className="field"
-                    value={composer.sourceMealId ?? ""}
-                    onChange={(event) => setComposer({ ...composer, sourceMealId: event.target.value || null })}
-                  >
-                    {leftovers.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )
+              <LeftoverSourceFields
+                sources={leftoverChoice.withBoard(leftovers, composerMeals)}
+                destMealId={composer.mealId}
+                editingDishId={composer.editingDishId}
+                sourceMealId={composer.sourceMealId}
+                sourceDishId={composer.sourceDishId}
+                onChange={(next) => setComposer({ ...composer, ...next })}
+              />
             ) : null}
             {composer.contentType === "leftovers_text" ? (
               <label>
@@ -786,10 +852,35 @@ export function WeekBoard({
               onEaters={(eaterIds) => setComposer({ ...composer, eaterIds })}
               onCook={(cookId) => setComposer({ ...composer, cookId })}
             />
+            {message && composer ? (
+              <p className={`status ${message.startsWith("Saved") ? "status-ok" : ""}`} role="status">
+                {message}
+              </p>
+            ) : null}
             <div className="row">
-              <button type="button" className="btn" disabled={busy || initialMembers.length === 0} onClick={() => void saveDish()}>
+              <button type="button" className="btn" disabled={busy} onClick={() => void saveDish()}>
                 Save on meal
               </button>
+              {composer.editingDishId ? (
+                <button
+                  type="button"
+                  className="btn btn-quiet"
+                  disabled={busy}
+                  onClick={() => {
+                    const meal = meals.find((item) => item.id === composer.mealId);
+                    const dish = meal?.dishes.find((item) => item.id === composer.editingDishId);
+                    if (dish) {
+                      void removeDish(dish).then((removed) => {
+                        if (removed) {
+                          setComposer(null);
+                        }
+                      });
+                    }
+                  }}
+                >
+                  Remove
+                </button>
+              ) : null}
               <button type="button" className="btn btn-quiet" onClick={() => setComposer(null)}>
                 Cancel
               </button>
@@ -837,6 +928,23 @@ function dateLabel(iso: string): string {
 
 function calendarGridStyle(dayCount: number): { gridTemplateColumns: string } {
   return { gridTemplateColumns: `var(--calendar-label-width) repeat(${dayCount}, minmax(0, 1fr))` };
+}
+
+function leftoverPick(
+  sources: readonly LeftoverSourceMeal[],
+  board: readonly PlannedMeal[],
+  destMealId: string,
+  editingDishId: string | null,
+  sourceMealId: string | null,
+  sourceDishId: string | null,
+): { sourceMealId: string | null; sourceDishId: string | null } {
+  const merged = leftoverChoice.withBoard(sources, board);
+  const mealId = leftoverChoice.mealId(merged, destMealId, sourceMealId);
+  const source = merged.find((meal) => meal.id === mealId);
+  return {
+    sourceMealId: mealId,
+    sourceDishId: leftoverChoice.dishId(leftoverChoice.dishes(source, editingDishId), sourceDishId),
+  };
 }
 
 function shiftWeek(weekStart: string, days: number): string {

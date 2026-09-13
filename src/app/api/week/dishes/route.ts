@@ -7,10 +7,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as { mealId?: string; draft?: Partial<DishDraft> };
   const draft = parseDishDraft(body.draft);
   if (!body.mealId || !draft) {
-    return NextResponse.json(
-      { error: "Pick a meal, at least one eater, and who cooks." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Pick a meal and what the dish is." }, { status: 400 });
   }
   try {
     const dish = await createWeekMealPlanner().addDish(body.mealId, draft);

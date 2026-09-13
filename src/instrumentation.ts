@@ -3,5 +3,7 @@ export async function register() {
     return;
   }
   const { startTelegramAnnounceScheduler } = await import("@/announce/startTelegramAnnounceScheduler");
+  const { startTelegramInboundPoller } = await import("@/announce/startTelegramInboundPoller");
   startTelegramAnnounceScheduler();
+  startTelegramInboundPoller();
 }

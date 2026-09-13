@@ -65,6 +65,18 @@ describe("TelegramWeekMessage", () => {
     expect(messages.tomorrow("2026-03-19", [])).toBe("Tomorrow · Thu 19 Mar\n\nNothing planned tomorrow.");
   });
 
+  it("links the dish title to the source URL instead of printing a raw address", () => {
+    const meals = [
+      meal("2026-03-16", "dinner", "Dinner", 300, [
+        { ...dish("Pasta", "Ada"), sourceUrl: "https://example.test/pasta" },
+      ]),
+    ];
+    expect(messages.week(["2026-03-16"], meals)).toContain(
+      '• Dinner — <a href="https://example.test/pasta">Pasta</a> · Ada cooks',
+    );
+    expect(messages.week(["2026-03-16"], meals)).not.toContain("\nhttps://");
+  });
+
   it("lists tomorrow’s meals when there are dishes", () => {
     const meals = [
       meal("2026-03-17", "lunch", "Lunch", 200, [dish("Leftovers of Monday dinner", "Kai")]),
@@ -108,6 +120,7 @@ function dish(title: string, cookName: string): PlannedDish {
     recipeId: "r",
     recipeMissing: false,
     sourceMealId: null,
+    sourceDishId: null,
     leftoverText: null,
     freeformText: null,
     title,
@@ -115,5 +128,6 @@ function dish(title: string, cookName: string): PlannedDish {
     cookName,
     eaters: [],
     sortOrder: 0,
+    sourceUrl: null,
   };
 }

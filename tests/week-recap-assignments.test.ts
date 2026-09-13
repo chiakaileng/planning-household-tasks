@@ -130,6 +130,7 @@ function people(cookMemberId: string, eaterMemberIds: string[], overrides: Parti
     contentType: "freeform",
     recipeId: null,
     sourceMealId: null,
+    sourceDishId: null,
     leftoverText: null,
     freeformText: null,
     cookMemberId,

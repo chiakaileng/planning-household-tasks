@@ -23,6 +23,11 @@ export class AppConfig {
   readonly telegramNightBeforeHour: number;
   readonly telegramSendTimeoutMs: number;
   readonly telegramSchedulerIntervalMs: number;
+  readonly telegramPollTimeoutSec: number;
+  readonly telegramPollIdleMs: number;
+  readonly telegramPickerPageSize: number;
+  readonly telegramMaxMessageChars: number;
+  readonly telegramInterviewLabelChars: number;
 
   constructor(env: Record<string, string | undefined> = process.env) {
     this.geminiApiKey = env.GEMINI_API_KEY ?? "";
@@ -45,6 +50,11 @@ export class AppConfig {
     this.telegramNightBeforeHour = optionalNumberFromEnv(env, "TELEGRAM_NIGHT_BEFORE_HOUR", 20);
     this.telegramSendTimeoutMs = optionalNumberFromEnv(env, "TELEGRAM_SEND_TIMEOUT_MS", 10000);
     this.telegramSchedulerIntervalMs = optionalNumberFromEnv(env, "TELEGRAM_SCHEDULER_INTERVAL_MS", 30000);
+    this.telegramPollTimeoutSec = optionalNumberFromEnv(env, "TELEGRAM_POLL_TIMEOUT_SEC", 25);
+    this.telegramPollIdleMs = optionalNumberFromEnv(env, "TELEGRAM_POLL_IDLE_MS", 250);
+    this.telegramPickerPageSize = optionalNumberFromEnv(env, "TELEGRAM_PICKER_PAGE_SIZE", 6);
+    this.telegramMaxMessageChars = optionalNumberFromEnv(env, "TELEGRAM_MAX_MESSAGE_CHARS", 4096);
+    this.telegramInterviewLabelChars = optionalNumberFromEnv(env, "TELEGRAM_INTERVIEW_LABEL_CHARS", 48);
     if (this.weekStartsOn < 0 || this.weekStartsOn > 6) {
       throw new Error("WEEK_STARTS_ON must be 0 (Sunday) through 6 (Saturday).");
     }
@@ -59,6 +69,21 @@ export class AppConfig {
     }
     if (this.telegramNightBeforeHour < 0 || this.telegramNightBeforeHour > 23) {
       throw new Error("TELEGRAM_NIGHT_BEFORE_HOUR must be 0 through 23.");
+    }
+    if (this.telegramPollTimeoutSec < 0 || this.telegramPollTimeoutSec > 50) {
+      throw new Error("TELEGRAM_POLL_TIMEOUT_SEC must be 0 through 50.");
+    }
+    if (this.telegramPollIdleMs < 0) {
+      throw new Error("TELEGRAM_POLL_IDLE_MS must be 0 or more.");
+    }
+    if (this.telegramPickerPageSize < 1) {
+      throw new Error("TELEGRAM_PICKER_PAGE_SIZE must be at least 1.");
+    }
+    if (this.telegramMaxMessageChars < 64) {
+      throw new Error("TELEGRAM_MAX_MESSAGE_CHARS must be at least 64.");
+    }
+    if (this.telegramInterviewLabelChars < 8) {
+      throw new Error("TELEGRAM_INTERVIEW_LABEL_CHARS must be at least 8.");
     }
   }
 
