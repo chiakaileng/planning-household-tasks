@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "prisma generate && next dev",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "prisma db push --skip-generate && next start",
     "test": "vitest run",
     "db:push": "prisma generate && prisma db push",
     "postinstall": "prisma generate"
@@ -13,6 +13,7 @@
   "dependencies": {
     "@prisma/client": "^6.16.1",
     "next": "^15.5.3",
+    "prisma": "^6.16.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
@@ -20,7 +21,6 @@
     "@types/node": "^22.18.1",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
-    "prisma": "^6.16.1",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }
