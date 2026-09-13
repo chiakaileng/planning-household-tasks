@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AssignRecipeToMeal } from "@/app/AssignRecipeToMeal";
+import { RecipeEmojiMark } from "@/app/RecipeEmojiFields";
 import { RecipeNotesTagsEditor } from "@/app/RecipeNotesTagsEditor";
+import { RecipePageManage } from "@/app/RecipePageManage";
+import { RecipeEmojiAssigner } from "@/domain/recipe/RecipeEmojiAssigner";
+import type { RecipeNutrition } from "@/domain/recipe/RecipeNutrition";
+import { RecipeNutritionSummary } from "@/domain/recipe/RecipeNutritionSummary";
 import { createRecipeRepository } from "@/lib/createImporter";
 
 export const dynamic = "force-dynamic";
@@ -16,20 +22,18 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
     <>
       <header className="content-header">
         <p>
-          <Link href="/">Back to Home</Link>
+          <Link href="/recipes">Back to Recipe</Link>
         </p>
-        <h1 className="page-title">{recipe.title}</h1>
+        <h1 className="page-title">
+          <RecipeEmojiMark emojis={new RecipeEmojiAssigner().display(recipe.emojis, recipe)} /> {recipe.title}
+        </h1>
         <p className="caption">
           {recipe.sourceType}
           {recipe.servings ? ` · ${recipe.servings} servings` : ""}
+          {nutritionLine(recipe)}
         </p>
       </header>
       <section className="card recipe-card">
-        {recipe.sourceUrl ? (
-          <p>
-            From <a href={recipe.sourceUrl}>{recipe.sourceUrl}</a>
-          </p>
-        ) : null}
         {recipe.notes ? <p>{recipe.notes}</p> : null}
         {recipe.tags.length > 0 ? (
           <div className="tag-row">
@@ -40,7 +44,14 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
             ))}
           </div>
         ) : null}
-        <RecipeNotesTagsEditor recipeId={recipe.id} initialNotes={recipe.notes} initialTags={recipe.tags} />
+        <RecipePageManage recipe={recipe} />
+        <AssignRecipeToMeal recipeId={recipe.id} />
+        <RecipeNotesTagsEditor
+          recipeId={recipe.id}
+          initialNotes={recipe.notes}
+          initialTags={recipe.tags}
+          initialEmojis={recipe.emojis}
+        />
         <h2 className="section-title">Ingredients</h2>
         <ul>
           {recipe.ingredients.map((ingredient, index) => (
@@ -60,4 +71,9 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
       </section>
     </>
   );
+}
+
+function nutritionLine(recipe: RecipeNutrition): string {
+  const summary = new RecipeNutritionSummary().format(recipe);
+  return summary ? ` · ${summary}` : "";
 }

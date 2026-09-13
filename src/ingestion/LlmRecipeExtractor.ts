@@ -1,6 +1,7 @@
 import type { RecipeDraft } from "@/domain/recipe/RecipeDraft";
 import type { SourceType } from "@/domain/recipe/SourceType";
 import { IngredientLineParser } from "@/ingestion/IngredientLineParser";
+import { RecipeNutritionParser } from "@/ingestion/RecipeNutritionParser";
 import type { ExtractedRecipePayload, IRecipeExtractor } from "@/ingestion/IRecipeExtractor";
 import type { ILlmClient } from "@/ingestion/ILlmClient";
 import { RecipeExtractionPrompt, type LlmRecipeJson } from "@/ingestion/RecipeExtractionPrompt";
@@ -10,6 +11,7 @@ export class LlmRecipeExtractor implements IRecipeExtractor {
     private readonly llm: ILlmClient,
     private readonly prompt: RecipeExtractionPrompt,
     private readonly ingredientParser: IngredientLineParser,
+    private readonly nutritionParser = new RecipeNutritionParser(),
   ) {}
 
   async extract(
@@ -33,6 +35,7 @@ export class LlmRecipeExtractor implements IRecipeExtractor {
     const draft: RecipeDraft = {
       title: payload.title.trim(),
       servings: typeof payload.servings === "number" ? payload.servings : null,
+      ...this.nutritionParser.parse(payload),
       ingredients: this.ingredientParser.parseAll(payload.ingredients),
       steps: (payload.steps ?? []).map((step) => step.trim()).filter(Boolean),
       sourceType: source.sourceType,
@@ -40,6 +43,7 @@ export class LlmRecipeExtractor implements IRecipeExtractor {
       sourceText: text,
       notes: null,
       tags: [],
+      emojis: [],
     };
 
     return {

@@ -12,7 +12,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Household meal planner",
-  description: "Add recipes from a URL or paste, then review before saving.",
+  description: "Plan household meals for the week. Recipes are optional content.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

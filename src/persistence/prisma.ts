@@ -1,9 +1,15 @@
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { PrismaClientStore } from "@/persistence/PrismaClientStore";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const store = new PrismaClientStore();
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+/**
+ * Always resolve through the store so a new generate is picked up on the next query.
+ */
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const client = store.current();
+    const value = Reflect.get(client, property, client);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});

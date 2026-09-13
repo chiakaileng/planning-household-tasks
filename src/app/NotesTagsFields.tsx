@@ -18,10 +18,22 @@ export function NotesTagsFields({
 }) {
   const [draftTag, setDraftTag] = useState("");
 
-  function addTag() {
-    const next = tags.normalizeAll([...tagList, draftTag]);
+  function addTag(raw = draftTag) {
+    const next = tags.normalizeAll([...tagList, raw]);
     onTagsChange(next);
     setDraftTag("");
+  }
+
+  function onDraftChange(value: string) {
+    if (!value.includes(",")) {
+      setDraftTag(value);
+      return;
+    }
+    const pieces = value.split(",");
+    const rest = pieces.pop() ?? "";
+    const completed = tags.normalizeAll([...tagList, ...pieces]);
+    onTagsChange(completed);
+    setDraftTag(rest);
   }
 
   return (
@@ -34,7 +46,7 @@ export function NotesTagsFields({
         placeholder="Household reminder — e.g. kid likes extra sauce"
       />
       <h3 className="list-title">Tags (optional)</h3>
-      <p className="caption">Type any label (child, family, parents, spicy). Saved lowercase so Child and child match.</p>
+      <p className="caption">Comma-separated labels (child, family, spicy). Saved lowercase so Child and child match.</p>
       <div className="tag-row">
         {tagList.map((tag) => (
           <button
@@ -51,14 +63,14 @@ export function NotesTagsFields({
         <input
           className="grow"
           value={draftTag}
-          onChange={(event) => setDraftTag(event.target.value)}
+          onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
               addTag();
             }
           }}
-          placeholder="Add a tag"
+          placeholder="child, family, spicy"
         />
         <button className="btn" type="button" onClick={addTag}>
           Add tag

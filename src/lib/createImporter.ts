@@ -7,9 +7,15 @@ import { LlmRecipeExtractor } from "@/ingestion/LlmRecipeExtractor";
 import { PageFetcher } from "@/ingestion/PageFetcher";
 import { RecipeExtractionPrompt } from "@/ingestion/RecipeExtractionPrompt";
 import { RecipeImporter } from "@/ingestion/RecipeImporter";
+import { RecipeSourceRefresher } from "@/ingestion/RecipeSourceRefresher";
 import { LlmUsageRepository } from "@/persistence/LlmUsageRepository";
 import { prisma } from "@/persistence/prisma";
+import { MealPlanRepository } from "@/persistence/MealPlanRepository";
+import { MemberRepository } from "@/persistence/MemberRepository";
+import { WeekMealPlanner } from "@/planning/WeekMealPlanner";
 import { RecipeRepository } from "@/persistence/RecipeRepository";
+import { CalendarDate } from "@/domain/plan/CalendarDate";
+import { WeekRange } from "@/domain/plan/WeekRange";
 
 /** Wires production implementations. Tests construct RecipeImporter with fakes instead. */
 export function createImporter(): RecipeImporter {
@@ -25,10 +31,24 @@ export function createImporter(): RecipeImporter {
   );
 }
 
+export function createRecipeSourceRefresher(): RecipeSourceRefresher {
+  return new RecipeSourceRefresher(createImporter());
+}
+
 export function createRecipeRepository(): RecipeRepository {
   return new RecipeRepository(prisma);
 }
 
 export function createUsageRepository(): LlmUsageRepository {
   return new LlmUsageRepository(prisma);
+}
+
+export function createMemberRepository(): MemberRepository {
+  return new MemberRepository(prisma);
+}
+
+export function createWeekMealPlanner(): WeekMealPlanner {
+  const config = new AppConfig();
+  const weeks = new WeekRange(new CalendarDate(config.weekTimeZone), config.weekStartsOn);
+  return new WeekMealPlanner(config, new MealPlanRepository(prisma, weeks));
 }

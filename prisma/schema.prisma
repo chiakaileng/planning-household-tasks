@@ -14,12 +14,19 @@ model Recipe {
   sourceType String
   sourceUrl  String?
   sourceText String?
-  servings   Int?
-  notes      String?
+  servings      Int?
+  calories      Int?
+  protein       Float?
+  fat           Float?
+  carbohydrates Float?
+  fibre         Float?
+  notes         String?
+  emojis     String   @default("[]")
   createdAt  DateTime @default(now())
   ingredients Ingredient[]
   steps       Step[]
   tags        RecipeTag[]
+  mealDishes  MealDish[]
 }
 
 model Ingredient {
@@ -55,6 +62,70 @@ model RecipeTag {
   tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([recipeId, tagId])
+}
+
+// One household, no accounts — just people later meals can pick as eaters or cooks.
+model Member {
+  id              String   @id @default(cuid())
+  name            String
+  lifeStage       String
+  avatarMode      String
+  avatarPresetKey String?
+  createdAt       DateTime @default(now())
+  cookedDishes    MealDish[]
+  eatenDishes     MealDishEater[]
+}
+
+// One meal (breakfast, lunch, dinner, or an extra) on one calendar day.
+model Meal {
+  id        String     @id @default(cuid())
+  date      String
+  slotKey   String
+  name      String
+  sortOrder Int
+  isExtra   Boolean    @default(false)
+  dishes    MealDish[]
+  leftoverOf MealDish[] @relation("LeftoverSource")
+
+  @@unique([date, slotKey])
+}
+
+// Extra meals for a week, optionally repeating on later weeks (slot only, not dishes).
+model ExtraMealTemplate {
+  id                 String   @id @default(cuid())
+  name               String
+  insertAfterSlotKey String
+  appliesFromWeek    String
+  recurs             Boolean
+  createdAt          DateTime @default(now())
+}
+
+model MealDish {
+  id               String          @id @default(cuid())
+  mealId           String
+  meal             Meal            @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  contentType      String
+  recipeId         String?
+  recipe           Recipe?         @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  sourceMealId     String?
+  sourceMeal       Meal?           @relation("LeftoverSource", fields: [sourceMealId], references: [id], onDelete: SetNull)
+  leftoverText     String?
+  freeformText     String?
+  titleSnapshot    String
+  cookMemberId     String?
+  cook             Member?         @relation(fields: [cookMemberId], references: [id], onDelete: SetNull)
+  cookNameSnapshot String
+  sortOrder        Int
+  eaters           MealDishEater[]
+}
+
+model MealDishEater {
+  id           String   @id @default(cuid())
+  dishId       String
+  dish         MealDish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  memberId     String?
+  member       Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  nameSnapshot String
 }
 
 // One row per Gemini call so you can see this-call and lifetime estimated spend.

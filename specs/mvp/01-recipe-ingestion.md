@@ -65,7 +65,7 @@ User gives constraints (available ingredients, cuisine, time) → LLM generates 
 - URL that is unreachable or times out — surface an error; offer to paste the page text by hand (Phase 1b), do not save
 - JSON-LD present but missing required fields (e.g. no ingredients list) — treat as Phase 1 failure, fall back to Phase 1b
 - Pasted text with no discernible recipe structure (e.g. a grocery ad) — show extraction failed; do not save; user can edit the draft or cancel
-- Duplicate import (same URL, or near-identical pasted text) — warn before save; do not silently merge or overwrite; user may still save a second copy
+- Duplicate import (same URL, or the same pasted text) — flag that it is already in the pool; do not save a second copy
 
 ## Deliverable for this task
 

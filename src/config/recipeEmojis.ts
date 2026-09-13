@@ -1,0 +1,101 @@
+/**
+ * Recipe emoji palette and keyword hints. Pages and helpers read this;
+ * they do not invent food icons in place.
+ */
+export type RecipeEmojiHint = {
+  emoji: string;
+  keywords: readonly string[];
+};
+
+export type RecipeEmojiCatalog = {
+  max: number;
+  palette: readonly string[];
+  hints: readonly RecipeEmojiHint[];
+};
+
+export const recipeEmojiCatalog: RecipeEmojiCatalog = {
+  max: 3,
+  palette: [
+    "🍚",
+    "🍜",
+    "🍝",
+    "🍲",
+    "🥗",
+    "🥘",
+    "🍛",
+    "🍣",
+    "🥟",
+    "🍞",
+    "🥚",
+    "🧀",
+    "🍗",
+    "🥩",
+    "🐟",
+    "🦐",
+    "🥦",
+    "🥕",
+    "🍅",
+    "🌽",
+    "🥑",
+    "🌶️",
+    "🧄",
+    "🧅",
+    "🍋",
+    "🍎",
+    "🍌",
+    "🫐",
+    "🥛",
+    "🧈",
+    "🫕",
+    "🥞",
+    "🧇",
+    "🥐",
+    "🧁",
+    "🍰",
+    "🍪",
+    "🍫",
+    "☕",
+    "🍵",
+  ],
+  hints: [
+    { emoji: "🍜", keywords: ["noodle", "ramen", "laksa", "pho", "mee", "pasta soup"] },
+    { emoji: "🍝", keywords: ["pasta", "spaghetti", "lasagna", "penne"] },
+    { emoji: "🍚", keywords: ["rice", "nasi", "biryani", "risotto", "fried rice"] },
+    { emoji: "🍛", keywords: ["curry", "korma", "masala", "rendang"] },
+    { emoji: "🍣", keywords: ["sushi", "sashimi", "maki"] },
+    { emoji: "🥟", keywords: ["dumpling", "gyoza", "wonton", "bao", "jiaozi"] },
+    { emoji: "🍲", keywords: ["soup", "stew", "broth", "hotpot"] },
+    { emoji: "🥗", keywords: ["salad", "slaw"] },
+    { emoji: "🥘", keywords: ["stir fry", "stir-fry", "skillet", "paella"] },
+    { emoji: "🍞", keywords: ["bread", "toast", "sandwich", "bun"] },
+    { emoji: "🥞", keywords: ["pancake", "hotcake"] },
+    { emoji: "🧇", keywords: ["waffle"] },
+    { emoji: "🥐", keywords: ["croissant", "pastry"] },
+    { emoji: "🧁", keywords: ["cupcake", "muffin"] },
+    { emoji: "🍰", keywords: ["cake", "tart"] },
+    { emoji: "🍪", keywords: ["cookie", "biscuit"] },
+    { emoji: "🍫", keywords: ["chocolate", "cocoa"] },
+    { emoji: "☕", keywords: ["coffee", "espresso"] },
+    { emoji: "🍵", keywords: ["tea", "matcha"] },
+    { emoji: "🍗", keywords: ["chicken", "poultry", "wing", "thigh"] },
+    { emoji: "🥩", keywords: ["beef", "steak", "pork", "lamb", "meat"] },
+    { emoji: "🐟", keywords: ["fish", "salmon", "tuna", "cod"] },
+    { emoji: "🦐", keywords: ["prawn", "shrimp", "seafood"] },
+    { emoji: "🥚", keywords: ["egg", "omelette", "omelet"] },
+    { emoji: "🧀", keywords: ["cheese", "cheddar", "parmesan"] },
+    { emoji: "🥦", keywords: ["broccoli", "vegetable", "veg"] },
+    { emoji: "🥕", keywords: ["carrot"] },
+    { emoji: "🍅", keywords: ["tomato"] },
+    { emoji: "🌽", keywords: ["corn", "maize"] },
+    { emoji: "🥑", keywords: ["avocado"] },
+    { emoji: "🌶️", keywords: ["chilli", "chili", "spicy", "pepper"] },
+    { emoji: "🧄", keywords: ["garlic"] },
+    { emoji: "🧅", keywords: ["onion"] },
+    { emoji: "🍋", keywords: ["lemon", "lime", "citrus"] },
+    { emoji: "🍎", keywords: ["apple"] },
+    { emoji: "🍌", keywords: ["banana"] },
+    { emoji: "🫐", keywords: ["berry", "blueberry", "strawberry"] },
+    { emoji: "🥛", keywords: ["milk", "yogurt", "yoghurt"] },
+    { emoji: "🧈", keywords: ["butter"] },
+  ],
+};

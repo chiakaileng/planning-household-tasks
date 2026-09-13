@@ -13,4 +13,8 @@ describe("TagNormalizer", () => {
     expect(normalizer.normalize("   ")).toBeNull();
     expect(normalizer.normalizeAll(["", "  ", "spicy"])).toEqual(["spicy"]);
   });
+
+  it("splits comma-delimited tags and drops empty pieces", () => {
+    expect(normalizer.normalizeAll(["child, family", " spicy,child,"])).toEqual(["child", "family", "spicy"]);
+  });
 });

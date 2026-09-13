@@ -16,6 +16,11 @@ describe("JsonLdRecipeParser", () => {
     expect(draft?.sourceType).toBe("url");
     expect(draft?.sourceUrl).toBe("https://example.test/pasta");
     expect(draft?.servings).toBe(4);
+    expect(draft?.calories).toBe(420);
+    expect(draft?.protein).toBe(18);
+    expect(draft?.fat).toBe(12);
+    expect(draft?.carbohydrates).toBe(45);
+    expect(draft?.fibre).toBe(6);
     expect(draft?.steps).toHaveLength(2);
     expect(draft?.ingredients.some((item) => item.parseFlagged)).toBe(true);
     expect(draft?.ingredients.find((item) => item.name === "flour")).toMatchObject({

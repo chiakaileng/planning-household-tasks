@@ -1,12 +1,16 @@
 import type { RecipeDraft } from "@/domain/recipe/RecipeDraft";
 import { IngredientLineParser } from "@/ingestion/IngredientLineParser";
+import { RecipeNutritionParser } from "@/ingestion/RecipeNutritionParser";
 import type { IJsonLdRecipeParser } from "@/ingestion/IJsonLdRecipeParser";
 
 /**
  * Maps schema.org Recipe JSON-LD only. No site-specific HTML selectors.
  */
 export class JsonLdRecipeParser implements IJsonLdRecipeParser {
-  constructor(private readonly ingredientParser: IngredientLineParser) {}
+  constructor(
+    private readonly ingredientParser: IngredientLineParser,
+    private readonly nutritionParser = new RecipeNutritionParser(),
+  ) {}
 
   parse(html: string, sourceUrl: string): RecipeDraft | null {
     const blocks = extractJsonLdBlocks(html);
@@ -20,6 +24,7 @@ export class JsonLdRecipeParser implements IJsonLdRecipeParser {
       const ingredientLines = asStringList(recipeNode.recipeIngredient);
       const steps = instructionLines(recipeNode.recipeInstructions);
       const servings = parseServings(recipeNode.recipeYield);
+      const nutrition = this.nutritionParser.parse(recipeNode.nutrition ?? recipeNode);
 
       // Spec: missing required fields (title or ingredients) → Phase 1 failure.
       if (!title || ingredientLines.length === 0) {
@@ -29,6 +34,7 @@ export class JsonLdRecipeParser implements IJsonLdRecipeParser {
       return {
         title,
         servings,
+        ...nutrition,
         ingredients: this.ingredientParser.parseAll(ingredientLines),
         steps,
         sourceType: "url",
@@ -36,6 +42,7 @@ export class JsonLdRecipeParser implements IJsonLdRecipeParser {
         sourceText: null,
         notes: null,
         tags: [],
+        emojis: [],
       };
     }
 

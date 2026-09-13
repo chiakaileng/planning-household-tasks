@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { AppConfig } from "@/config/AppConfig";
 import type { RecipeDraft } from "@/domain/recipe/RecipeDraft";
+import { emptyRecipeNutrition } from "@/domain/recipe/RecipeNutrition";
 import { HtmlTextExtractor } from "@/ingestion/HtmlTextExtractor";
 import { IngredientLineParser } from "@/ingestion/IngredientLineParser";
 import type { IJsonLdRecipeParser } from "@/ingestion/IJsonLdRecipeParser";
@@ -26,6 +27,9 @@ function testConfig(overrides: Record<string, string> = {}) {
     PAGE_FETCH_TIMEOUT_MS: "1000",
     PAGE_FETCH_USER_AGENT: "test-agent",
     DATABASE_URL: "file:./dev.db",
+    WEEK_TIMEZONE: "Asia/Singapore",
+    WEEK_STARTS_ON: "1",
+    LEFTOVER_LOOKBACK_DAYS: "7",
     ...overrides,
   });
 }
@@ -76,6 +80,8 @@ function importer(options: {
     sourceText: "rice",
     notes: null,
     tags: [],
+    emojis: [],
+    ...emptyRecipeNutrition(),
   };
 
   return new RecipeImporter(
@@ -141,6 +147,8 @@ describe("RecipeImporter.extractFromPastedText", () => {
       sourceText: "rice",
       notes: null,
       tags: [],
+      emojis: [],
+      ...emptyRecipeNutrition(),
     };
     const result = await importer({
       fetcher: new FixedFetcher(""),

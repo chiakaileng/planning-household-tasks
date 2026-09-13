@@ -9,12 +9,15 @@ export type DuplicateWarning = {
 
 export type RecipeListQuery = {
   tag?: string;
+  q?: string;
 };
 
 export interface IRecipeRepository {
   save(draft: RecipeDraft): Promise<SavedRecipe>;
-  findDuplicate(draft: RecipeDraft): Promise<DuplicateWarning | null>;
+  findDuplicate(draft: RecipeDraft, excludeId?: string): Promise<DuplicateWarning | null>;
   list(query?: RecipeListQuery): Promise<SavedRecipe[]>;
   getById(id: string): Promise<SavedRecipe | null>;
-  updateNotesAndTags(id: string, notes: string | null, tags: string[]): Promise<SavedRecipe | null>;
+  updateNotesAndTags(id: string, notes: string | null, tags: string[], emojis?: string[]): Promise<SavedRecipe | null>;
+  update(id: string, draft: RecipeDraft): Promise<SavedRecipe | null>;
+  remove(id: string): Promise<boolean>;
 }
